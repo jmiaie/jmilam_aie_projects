@@ -1,0 +1,8 @@
+{
+  "name": "Copy of LegalYoda",
+  "description": "A premium legal lead marketplace and evidence management platform connecting clients with specialized legal professionals. Features AI-powered case analysis, secure evidence repositories, and chain-of-custody tracking.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
