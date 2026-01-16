@@ -16,14 +16,18 @@ import {
   Clock, 
   MapPin, 
   FileText, 
-  CheckCircle2, 
   ChevronRight,
   TrendingUp,
-  Tag
+  Tag,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  Handshake
 } from 'lucide-react';
 import { LegalLead, CaseCategory } from '../types';
+import { analyzeCaseDescription } from '../services/geminiService';
 
-const MOCK_LEADS: LegalLead[] = [
+const INITIAL_MOCK_LEADS: LegalLead[] = [
   {
     id: '1',
     title: 'Multi-Vehicle Pileup on I-95',
@@ -87,6 +91,32 @@ const DATA_VIZ = [
 
 export const LeadMarketplace: React.FC = () => {
   const [filter, setFilter] = useState('All');
+  const [description, setDescription] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [leads, setLeads] = useState<LegalLead[]>(INITIAL_MOCK_LEADS);
+
+  const handleAnalyze = async () => {
+    if (!description.trim()) return;
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const result = await analyzeCaseDescription(description);
+      setAnalysisResult(result);
+    } catch (error) {
+      console.error("Analysis failed", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleClaimLead = (id: string) => {
+    setLeads(prevLeads => prevLeads.map(lead => 
+      lead.id === id ? { ...lead, status: 'Claimed' } : lead
+    ));
+  };
+
+  const filteredLeads = leads.filter(lead => filter === 'All' || lead.category === filter);
 
   return (
     <div className="space-y-6">
@@ -107,8 +137,89 @@ export const LeadMarketplace: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Marketplace Stats */}
+        {/* Sidebar and AI Analyzer */}
         <div className="lg:col-span-1 space-y-6">
+          {/* AI Intake Section */}
+          <div className="bg-white p-6 rounded-xl border border-emerald-100 shadow-sm ring-1 ring-emerald-50">
+            <div className="flex items-center space-x-2 mb-4">
+              <Sparkles className="text-emerald-500" size={20} />
+              <h3 className="font-bold text-slate-800">AI Lead Analyzer</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Paste a case description to instantly categorize and vet the lead details.</p>
+            
+            <textarea
+              className="w-full h-32 p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none mb-4"
+              placeholder="Example: My client was involved in a slip and fall at a grocery store in Miami last Tuesday. They have medical records showing a fractured hip..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            
+            <button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || !description.trim()}
+              className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Analyzing...</span>
+                </>
+              ) : (
+                <span>Analyze Case</span>
+              )}
+            </button>
+
+            {analysisResult && (
+              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase">Analysis Complete</span>
+                    <CheckCircle2 size={14} className="text-emerald-500" />
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm mb-1">{analysisResult.category}</h4>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${analysisResult.urgency === 'High' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {analysisResult.urgency} Urgency
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500">Est. ${analysisResult.suggestedValue?.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {analysisResult.summary && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Case Summary</p>
+                    <p className="text-sm text-slate-700 leading-relaxed font-medium bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
+                      "{analysisResult.summary}"
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key Facts</p>
+                  <ul className="space-y-1.5">
+                    {analysisResult.keyPoints?.map((point: string, idx: number) => (
+                      <li key={idx} className="text-xs text-slate-600 flex items-start space-x-2">
+                        <div className="mt-1 w-1 h-1 bg-emerald-400 rounded-full shrink-0" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setAnalysisResult(null);
+                    setDescription('');
+                  }}
+                  className="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest block w-full text-center mt-2"
+                >
+                  Clear Analysis
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Marketplace Stats */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-800 flex items-center space-x-2">
@@ -132,9 +243,6 @@ export const LeadMarketplace: React.FC = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-slate-400 mt-4 text-center">
-              Personal Injury leads are currently trending +12% this week.
-            </p>
           </div>
 
           <div className="bg-slate-900 text-white p-6 rounded-xl shadow-xl">
@@ -164,7 +272,7 @@ export const LeadMarketplace: React.FC = () => {
             ))}
           </div>
 
-          {MOCK_LEADS.map((lead) => (
+          {filteredLeads.map((lead) => (
             <div 
               key={lead.id} 
               className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-all group cursor-pointer"
@@ -177,7 +285,9 @@ export const LeadMarketplace: React.FC = () => {
                     `}>
                       {lead.urgency} Urgency
                     </span>
-                    <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                      ${lead.status === 'Claimed' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}
+                    `}>
                       {lead.status}
                     </span>
                   </div>
@@ -216,10 +326,37 @@ export const LeadMarketplace: React.FC = () => {
                     <span>{lead.evidenceCount} files</span>
                   </div>
                 </div>
-                <button className="flex items-center space-x-1 text-emerald-600 font-bold text-sm hover:underline">
-                  <span>View Full Case</span>
-                  <ChevronRight size={16} />
-                </button>
+                <div className="flex items-center space-x-4">
+                  <button className="flex items-center space-x-1 text-slate-600 font-bold text-sm hover:text-emerald-600 transition-colors">
+                    <span>Details</span>
+                    <ChevronRight size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClaimLead(lead.id);
+                    }}
+                    disabled={lead.status === 'Claimed'}
+                    className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all
+                      ${lead.status === 'Claimed' 
+                        ? 'bg-emerald-50 text-emerald-600 cursor-not-allowed border border-emerald-100' 
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow'
+                      }
+                    `}
+                  >
+                    {lead.status === 'Claimed' ? (
+                      <>
+                        <CheckCircle2 size={16} />
+                        <span>Claimed</span>
+                      </>
+                    ) : (
+                      <>
+                        <Handshake size={16} />
+                        <span>Claim Lead</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           ))}
